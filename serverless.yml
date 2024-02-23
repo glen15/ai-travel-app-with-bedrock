@@ -1,0 +1,18 @@
+service: <<YOUR-IAM-USER-NAME>>-lambda-bedrock-api
+frameworkVersion: "3"
+provider:
+  name: aws
+  runtime: python3.12
+  region: ap-northeast-2
+  iam:
+    role:
+      managedPolicies: "arn:aws:iam::aws:policy/AmazonBedrockFullAccess"
+
+functions:
+  invokeBedrockRuntime:
+    handler: lambda.lambda_handler
+    # app: lambda 핸들러가 작성된 파일
+    # lambda_handler: lambda 핸들러 이름
+    timeout: 900
+    memorySize: 128
+    url: true
