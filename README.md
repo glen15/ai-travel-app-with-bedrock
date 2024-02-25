@@ -1,7 +1,6 @@
 # streamlit-lambda-chatbot
 
 `git clone`
-`npm install serverless -g`
 
 ```
 pip install --no-build-isolation --force-reinstall \
@@ -10,8 +9,6 @@ pip install --no-build-isolation --force-reinstall \
  "streamlit>=1.31.1" \
  requests
 ```
-
-`sls deploy`
 
 `streamlit run streamlit.py`
 에러 : 보안그룹

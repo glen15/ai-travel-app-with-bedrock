@@ -1,57 +1,89 @@
 import streamlit as st
-import requests
 import json
 import boto3
+import os
+import base64
+import random
 
-ENDPOINT_LAMBDA_URL = "<<YOUR-LAMBDA-URL>>"
+bedrock_runtime = boto3.client(
+    service_name="bedrock-runtime", region_name="us-east-1"
+)
 
-def bedrock_chat(user_message):
-    bedrock_runtime = boto3.client(
-            service_name="bedrock-runtime", region_name="us-east-1"
-        )
+def invoke_model(prompt, model_id, max_tokens=1000):
+    body = json.dumps({
+        "prompt": prompt,
+        "temperature": 0,
+        "top_p": 0.01,
+        "max_tokens_to_sample": max_tokens,
+    })
+    response = bedrock_runtime.invoke_model(body=body, modelId=model_id)
+    return json.loads(response.get("body").read())["completion"]
 
-    request_body = json.loads(event.get("body"))
-    prompt = (
-        request_body.get("prompt")
-        if "prompt" in request_body
-        else "Amazon Bedrock이 뭐야? 3문장 이내로 답변해"
-    )
-    print(f">>>>>>>>>>>> prompt: {prompt}")
-    # Anthropic의 Claude 모델 사용
-    # 한국어를 비교적 잘 지원
-    # https://docs.aws.amazon.com/bedrock/latest/userguide/model-parameters-claude.html
-    body = json.dumps(
-        {
-            "prompt": f"\n\nHuman:{prompt}\n\nAssistant:",
-            "temperature": 0,
-            "top_p": 0.01,
-            "max_tokens_to_sample": 1000,
+def kor_to_eng(text):
+    prompt = f"\n\nHuman:Translate '{text}' into English\n\nAssistant:"
+    return invoke_model(prompt, model_id="anthropic.claude-v2", max_tokens=100)
+
+def generate_plan(place, duration, purpose):
+    prompt = f"\n\nSystem:You are an expert in creating travel plans\n\nHuman:Create a travel plan for {purpose} during {duration} in {place} Make sure to speak in Korean\n\nAssistant:"
+    return invoke_model(prompt, model_id="anthropic.claude-v2")
+
+def generate_image(place):
+    seed = random.randint(0, 2147483647)
+    text = kor_to_eng(f"{place}을 여행하는 포스터를 생성해라")
+    prompt = {
+        "taskType": "TEXT_IMAGE", 
+        "textToImageParams": {"text": text},
+        "imageGenerationConfig": {
+            "numberOfImages": 1, "quality": "standard", "cfgScale": 7.5,
+            "height": 512, "width": 512, "seed": seed,
         }
-    )
-    # buffered
-    response = bedrock_runtime.invoke_model(
-        body=body, modelId="anthropic.claude-v2"
-    )
-    response_body = json.loads(response.get("body").read())
-    model_response = response_body["completion"]
-    print(f">>>>>>>>>>>> model output: {model_response}")
-    return done(None, {"output": model_response})
-
-def done(err, res):
-    if err:
-        print(f"!!!!!!!!!!!!{err}")
-
-    return {
-        "statusCode": "400" if err else "200",
-        # 한글 깨짐을 방지하기 위해 ensure_ascii 옵션 추가
-        "body": json.dumps(res, ensure_ascii=False),
-        "headers": {"Content-Type": "application/json"},
     }
+    response = bedrock_runtime.invoke_model(
+        modelId="amazon.titan-image-generator-v1", body=json.dumps(prompt)
+    )
+    base64_image_data = json.loads(response["body"].read())["images"][0]
+    output_folder = 'generated_images'
+    os.makedirs(output_folder, exist_ok=True)
+    file_path = os.path.join(output_folder, f"image.png")
+    with open(file_path, 'wb') as file:
+        file.write(base64.b64decode(base64_image_data))
+    return file_path
 
+def bedrock_chat(ai_result, prompt):
+    prompt = f"System:{ai_result}에 기반해서 질문에 대답해라\n\nHuman:{prompt}\n\nAssistant:"
+    return invoke_model(prompt, model_id="anthropic.claude-v2")
+
+### 화면 구성 ###
 st.title("Chatbot powered by Bedrock")
 
+if "result_plan" not in st.session_state:
+    st.session_state.result_plan = "멋진 계획을 만들어드릴게요!"
+
+if "result_image" not in st.session_state:
+    st.session_state.result_image = "generated_images/sample.png"
+
+st.header(":blue[GEN-AI] 텍스트 & 이미지 :sunglasses:", divider="rainbow")
+col1, col2 = st.columns(2)
+with col1:
+    place = st.text_input('원하는 여행 장소를 알려주세요.', '프랑스 파리')
+    duration = st.text_input('원하는 여행 기간을 알려주세요.', '2박 3일')
+    purpose = st.text_input('원하는 여행 목적을 알려주세요.', '예술품 관람')
+    st.divider()
+    if st.button("이미지 생성", type="primary"):
+        with st.spinner("이미지를 생성하는 중입니다..."):
+            st.session_state.result_image = generate_image(place)
+    st.image(st.session_state.result_image, caption="AI 생성 이미지", use_column_width=True)
+with col2:
+    if st.button("여행 계획 만들기", type="primary"):
+        with st.spinner("여행 계획을 생성하는 중입니다..."):
+            st.session_state.result_plan = generate_plan(place, duration, purpose)
+    st.text_area("", st.session_state.result_plan)
+st.divider()
+
+st.header(":blue[GEN-AI] 챗봇 :sunglasses:", divider="rainbow")
+
 if "messages" not in st.session_state:
-    st.session_state.messages = []
+    st.session_state.messages = [{"role": "assistant", "content": "생성된 당신의 여행 계획에 대해서 물어보세요!"}]
 
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
@@ -63,11 +95,8 @@ if prompt := st.chat_input("Message Bedrock..."):
         st.markdown(prompt)
 
     with st.chat_message("assistant"):
-        # buffered
         with st.spinner("Thinking..."):
-            response_raw = requests.post(ENDPOINT_LAMBDA_URL, json={"prompt": prompt})
-            ai_response = bedrock_chat(prompt)
-            print(f"AI 응답: {ai_response}")
-        st.write(ai_response)
+            result = bedrock_chat(st.session_state.result_plan, prompt)
+        st.write(result)
 
-    st.session_state.messages.append({"role": "assistant", "content": ai_response})
+    st.session_state.messages.append({"role": "assistant", "content": result})
