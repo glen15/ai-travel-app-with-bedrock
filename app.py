@@ -33,7 +33,7 @@ with col2:
         with st.spinner("여행 계획을 생성하는 중입니다..."):
             st.session_state.messages = [{"role": "assistant", "content": "생성된 당신의 여행 계획에 대해서 물어보세요!"}]
             st.session_state.result_plan = generate_plan(place, duration, purpose)
-    st.text_area(st.session_state.result_plan, label_visibility="hidden")
+    st.text_area("여행 계획을 제시할게요.", st.session_state.result_plan, label_visibility="hidden")
 st.divider()
 df = create_dataframe()
 st.header("다른 사람들의 :blue[선택]은? :", divider="rainbow")
