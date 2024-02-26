@@ -10,4 +10,3 @@ pip install --no-build-isolation --force-reinstall \
 ```
 
 `streamlit run streamlit.py`
-에러 : 보안그룹
