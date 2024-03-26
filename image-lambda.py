@@ -18,19 +18,7 @@ def lambda_handler(event, context):
     # 요청 본문의 인코딩 문제를 해결하기 위해, 문자열을 JSON 객체로 파싱
     body = json.loads(body_str)
     logger.info("Received request body: %s", body)
-    prompt = body.get("prompt")
-    print(prompt)
-
-    max_tokens = 1024
-
-    body = json.dumps(
-        {
-            "prompt": prompt,
-            "temperature": 0,
-            "top_p": 0.01,
-            "max_tokens_to_sample": max_tokens,
-        }
-    )
+    print(body)
 
     # Bedrock 클라이언트 생성 시 AWS 자격 증명 포함
     bedrock = boto3.client(
@@ -40,12 +28,10 @@ def lambda_handler(event, context):
         aws_secret_access_key=aws_secret_access_key,
     )
     response = bedrock.invoke_model(
-        body=body, modelId="anthropic.claude-3-sonnet-20240229-v1:0"
+        modelId="amazon.titan-image-generator-v1", body=json.dumps(body)
     )
-    response_body = json.loads(response.get("body").read())
-    data = response_body.get("content")[0]
-    ai_result = data["text"]
-    print(ai_result)
+    base64_image_data = json.loads(response["body"].read())["images"][0]
+    print("이미지 생성 완료")
 
-    # 예시 응답
-    return {"statusCode": 200, "body": json.dumps({"message": ai_result})}
+    # # 예시 응답
+    return {"statusCode": 200, "body": json.dumps({"image": base64_image_data})}

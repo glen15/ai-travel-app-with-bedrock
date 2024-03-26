@@ -14,18 +14,17 @@ aws_secret_access_key = os.environ.get("SECRET_ACCESS_KEY")
 
 def lambda_handler(event, context):
     # event 변수에서 요청의 본문을 추출하고, 문자열을 JSON 객체로 파싱
-    body_str = event.get("prompt")
+    body_str = event.get("body")
     # 요청 본문의 인코딩 문제를 해결하기 위해, 문자열을 JSON 객체로 파싱
     body = json.loads(body_str)
     logger.info("Received request body: %s", body)
-    prompt = body.get("prompt")
-    print(prompt)
+    print(body)
 
     max_tokens = 1024
 
     body = json.dumps(
         {
-            "prompt": prompt,
+            "prompt": body,
             "temperature": 0,
             "top_p": 0.01,
             "max_tokens_to_sample": max_tokens,
@@ -39,12 +38,8 @@ def lambda_handler(event, context):
         aws_access_key_id=aws_access_key_id,
         aws_secret_access_key=aws_secret_access_key,
     )
-    response = bedrock.invoke_model(
-        body=body, modelId="anthropic.claude-3-sonnet-20240229-v1:0"
-    )
-    response_body = json.loads(response.get("body").read())
-    data = response_body.get("content")[0]
-    ai_result = data["text"]
+    response = bedrock.invoke_model(body=body, modelId="anthropic.claude-v2")
+    ai_result = json.loads(response.get("body").read())["completion"]
     print(ai_result)
 
     # 예시 응답

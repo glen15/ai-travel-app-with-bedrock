@@ -25,7 +25,15 @@ def invoke_model(prompt, model_id, max_tokens=1024):
 
 def kor_to_eng(text):
     prompt = f"\n\nHuman:Translate '{text}' into English\n\nAssistant:"
-    return invoke_model(prompt, model_id="anthropic.claude-v2", max_tokens=100)
+    lambda_url = (
+        "https://7qbhssw74q5rj54igax7phwo2i0rpmpu.lambda-url.ap-northeast-2.on.aws/"
+    )
+    response = requests.post(lambda_url, json=prompt)
+    response_data = response.json()
+    ai_result = response_data["message"]
+    print(f"번역결과{ai_result}")
+
+    return ai_result
 
 
 def generate_plan(place, duration, purpose):
@@ -37,7 +45,8 @@ def generate_plan(place, duration, purpose):
     response = requests.post(lambda_url, json=prompt)
     response_data = response.json()
     ai_result = response_data["message"]
-    print(ai_result)
+    print(f"계획 : {ai_result}")
+
     return ai_result
 
 
@@ -58,13 +67,13 @@ def generate_image(place):
             "seed": seed,
         },
     }
-    bedrock_runtime = boto3.client(
-        service_name="bedrock-runtime", region_name="us-east-1"
+    lambda_url = (
+        "https://3blatsqw4hzdvhjlxwc3k7yvri0euoqq.lambda-url.ap-northeast-2.on.aws/"
     )
-    response = bedrock_runtime.invoke_model(
-        modelId="amazon.titan-image-generator-v1", body=json.dumps(prompt)
-    )
-    base64_image_data = json.loads(response["body"].read())["images"][0]
+    response = requests.post(lambda_url, json=prompt)
+    response_data = response.json()
+    base64_image_data = response_data["image"]
+
     output_folder = "generated_images"
     os.makedirs(output_folder, exist_ok=True)
     file_path = os.path.join(output_folder, f"image.png")
@@ -77,4 +86,11 @@ def bedrock_chat(ai_result, prompt):
     prompt = (
         f"System:{ai_result}에 기반해서 질문에 대답해라\n\nHuman:{prompt}\n\nAssistant:"
     )
-    return invoke_model(prompt, model_id="anthropic.claude-v2")
+    lambda_url = (
+        "https://7qbhssw74q5rj54igax7phwo2i0rpmpu.lambda-url.ap-northeast-2.on.aws/"
+    )
+    response = requests.post(lambda_url, json=prompt)
+    response_data = response.json()
+    ai_result = response_data["message"]
+    print(f"대화 : {ai_result}")
+    return ai_result
