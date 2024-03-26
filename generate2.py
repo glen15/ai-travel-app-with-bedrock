@@ -3,6 +3,7 @@ import boto3
 import os
 import base64
 import random
+import requests
 from database import insert_travel_plan
 
 
@@ -30,7 +31,14 @@ def kor_to_eng(text):
 def generate_plan(place, duration, purpose):
     prompt = f"\n\nSystem:You are an expert in creating travel plans\n\nHuman:Create a travel plan for {purpose} during {duration} in {place} Make sure to speak in Korean\n\nAssistant:"
     insert_travel_plan(place, duration, purpose)
-    return invoke_model(prompt, model_id="anthropic.claude-v2")
+    lambda_url = (
+        "https://7qbhssw74q5rj54igax7phwo2i0rpmpu.lambda-url.ap-northeast-2.on.aws/"
+    )
+    response = requests.post(lambda_url, json=prompt)
+    response_data = response.json()
+    ai_result = response_data["message"]
+    print(ai_result)
+    return ai_result
 
 
 def generate_image(place):
